@@ -1,0 +1,399 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Log4j 2 構成（log4j-api / log4j-core / log4j-slf4j2-impl 2.25.3）。
+
+    WildFly / JBoss EAP 8.1 では jboss-deployment-structure.xml で
+    org.apache.logging.log4j.api と org.jboss.logmanager.log4j2 を除外している。
+    除外しないとサーバ同梱の log4j-api が log4j2-jboss-logmanager に束縛され、
+    このファイルの RollingFile は使われない。
+
+    出力先は環境変数 EFS_LOGS_PATH（未設定時は /mnt/logs/front/logs/inter-api）。
+    システムプロパティが先、環境変数がその次。テストはシステムプロパティで上書きする。
+
+    ファイル名の先頭はホスト IPv4（区切りはハイフン）。例: 10-0-1-23_tracelog
+
+    tracelog を含む全ファイルは時間単位でローテーションする。
+    filePattern の最小単位が時（%d{yyyy-MM-dd-HH}）で、
+    TimeBasedTriggeringPolicy interval="1" modulate="true" なので正時に切り替わる。
+    現行ファイルをリネームする方式（fileName + filePattern）にしている。
+    EFS / NFS 上でこのリネーム後に開いたままの fd が
+    java.io.IOException: Stale file handle になるかを調べるための構成。
+    DirectWriteRolloverStrategy にはしない（リネームを避ける回避策になるため）。
+    アペンダの例外はリクエストを落とさない（ignoreExceptions="true"）。
+    失敗は StatusLogger が stderr（WildFly の server.log）へ出す。
+
+    保持は 336 時間（14 日）かつローテーション済み合計 1GB。
+-->
+<Configuration status="WARN">
+    <Properties>
+        <Property name="LOG_DIR">${sys:EFS_LOGS_PATH:-${env:EFS_LOGS_PATH:-/mnt/logs/front/logs/inter-api}}</Property>
+        <Property name="HOST_IP">${dhlog:hostip}</Property>
+        <Property name="ERR_FILE_ID">${dhlog:rand:20:alnum}</Property>
+        <Property name="ASYNCDRIVER_ERR_FILE_ID">${dhlog:rand:17:digits}</Property>
+        <Property name="APP_PATTERN">%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%t] %c{48} - %m%n%ex</Property>
+    </Properties>
+
+    <Appenders>
+        <Console name="CONSOLE" target="SYSTEM_OUT">
+            <PatternLayout pattern="${APP_PATTERN}" charset="UTF-8"/>
+        </Console>
+
+        <RollingFile name="APP_FILE"
+                     fileName="${LOG_DIR}/${HOST_IP}_application.log"
+                     filePattern="${LOG_DIR}/${HOST_IP}_application.log.%d{yyyy-MM-dd-HH}"
+                     ignoreExceptions="true">
+            <PatternLayout pattern="${APP_PATTERN}" charset="UTF-8"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+            </Policies>
+            <DefaultRolloverStrategy>
+                <Delete basePath="${LOG_DIR}" maxDepth="1">
+                    <IfFileName glob="${HOST_IP}_application.log.*"/>
+                    <IfAny>
+                        <IfAccumulatedFileCount exceeds="336"/>
+                        <IfAccumulatedFileSize exceeds="1 GB"/>
+                    </IfAny>
+                </Delete>
+            </DefaultRolloverStrategy>
+        </RollingFile>
+
+        <RollingFile name="ERROR_FILE"
+                     fileName="${LOG_DIR}/${HOST_IP}_error.log"
+                     filePattern="${LOG_DIR}/${HOST_IP}_error.log.%d{yyyy-MM-dd-HH}"
+                     ignoreExceptions="true">
+            <ThresholdFilter level="ERROR" onMatch="ACCEPT" onMismatch="DENY"/>
+            <PatternLayout pattern="${APP_PATTERN}" charset="UTF-8"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+            </Policies>
+            <DefaultRolloverStrategy>
+                <Delete basePath="${LOG_DIR}" maxDepth="1">
+                    <IfFileName glob="${HOST_IP}_error.log.*"/>
+                    <IfAny>
+                        <IfAccumulatedFileCount exceeds="336"/>
+                        <IfAccumulatedFileSize exceeds="1 GB"/>
+                    </IfAny>
+                </Delete>
+            </DefaultRolloverStrategy>
+        </RollingFile>
+
+        <RollingFile name="KEAX_FILE"
+                     fileName="${LOG_DIR}/${HOST_IP}_keax0003.log"
+                     filePattern="${LOG_DIR}/${HOST_IP}_keax0003.log.%d{yyyy-MM-dd-HH}"
+                     ignoreExceptions="true">
+            <PatternLayout pattern="${APP_PATTERN}" charset="UTF-8"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+            </Policies>
+            <DefaultRolloverStrategy>
+                <Delete basePath="${LOG_DIR}" maxDepth="1">
+                    <IfFileName glob="${HOST_IP}_keax0003.log.*"/>
+                    <IfAny>
+                        <IfAccumulatedFileCount exceeds="336"/>
+                        <IfAccumulatedFileSize exceeds="1 GB"/>
+                    </IfAny>
+                </Delete>
+            </DefaultRolloverStrategy>
+        </RollingFile>
+
+        <RollingFile name="KEAX0010_FILE"
+                     fileName="${LOG_DIR}/${HOST_IP}_keax0010.log"
+                     filePattern="${LOG_DIR}/${HOST_IP}_keax0010.log.%d{yyyy-MM-dd-HH}"
+                     ignoreExceptions="true">
+            <PatternLayout pattern="${APP_PATTERN}" charset="UTF-8"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+            </Policies>
+            <DefaultRolloverStrategy>
+                <Delete basePath="${LOG_DIR}" maxDepth="1">
+                    <IfFileName glob="${HOST_IP}_keax0010.log.*"/>
+                    <IfAny>
+                        <IfAccumulatedFileCount exceeds="336"/>
+                        <IfAccumulatedFileSize exceeds="1 GB"/>
+                    </IfAny>
+                </Delete>
+            </DefaultRolloverStrategy>
+        </RollingFile>
+
+        <RollingFile name="ERR_FILE"
+                     fileName="${LOG_DIR}/${HOST_IP}_${ERR_FILE_ID}.err"
+                     filePattern="${LOG_DIR}/${HOST_IP}_${ERR_FILE_ID}.err.%d{yyyy-MM-dd-HH}"
+                     ignoreExceptions="true">
+            <PatternLayout pattern="${APP_PATTERN}" charset="UTF-8"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+            </Policies>
+            <DefaultRolloverStrategy>
+                <Delete basePath="${LOG_DIR}" maxDepth="1">
+                    <IfFileName glob="${HOST_IP}_${ERR_FILE_ID}.err.*"/>
+                    <IfAny>
+                        <IfAccumulatedFileCount exceeds="336"/>
+                        <IfAccumulatedFileSize exceeds="1 GB"/>
+                    </IfAny>
+                </Delete>
+            </DefaultRolloverStrategy>
+        </RollingFile>
+
+        <RollingFile name="ACCESS_FILE"
+                     fileName="${LOG_DIR}/${HOST_IP}_accesslog"
+                     filePattern="${LOG_DIR}/${HOST_IP}_accesslog.%d{yyyy-MM-dd-HH}"
+                     ignoreExceptions="true">
+            <PatternLayout pattern="${APP_PATTERN}" charset="UTF-8"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+            </Policies>
+            <DefaultRolloverStrategy>
+                <Delete basePath="${LOG_DIR}" maxDepth="1">
+                    <IfFileName glob="${HOST_IP}_accesslog.*"/>
+                    <IfAny>
+                        <IfAccumulatedFileCount exceeds="336"/>
+                        <IfAccumulatedFileSize exceeds="1 GB"/>
+                    </IfAny>
+                </Delete>
+            </DefaultRolloverStrategy>
+        </RollingFile>
+
+        <!-- tracelog。時間ローテーション。stale file handle 調査の対象。 -->
+        <RollingFile name="TRACE_FILE"
+                     fileName="${LOG_DIR}/${HOST_IP}_tracelog"
+                     filePattern="${LOG_DIR}/${HOST_IP}_tracelog.%d{yyyy-MM-dd-HH}"
+                     ignoreExceptions="true">
+            <PatternLayout pattern="${APP_PATTERN}" charset="UTF-8"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+            </Policies>
+            <DefaultRolloverStrategy>
+                <Delete basePath="${LOG_DIR}" maxDepth="1">
+                    <IfFileName glob="${HOST_IP}_tracelog.*"/>
+                    <IfAny>
+                        <IfAccumulatedFileCount exceeds="336"/>
+                        <IfAccumulatedFileSize exceeds="1 GB"/>
+                    </IfAny>
+                </Delete>
+            </DefaultRolloverStrategy>
+        </RollingFile>
+
+        <RollingFile name="DBIO_FILE"
+                     fileName="${LOG_DIR}/${HOST_IP}_dbiolog"
+                     filePattern="${LOG_DIR}/${HOST_IP}_dbiolog.%d{yyyy-MM-dd-HH}"
+                     ignoreExceptions="true">
+            <PatternLayout pattern="${APP_PATTERN}" charset="UTF-8"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+            </Policies>
+            <DefaultRolloverStrategy>
+                <Delete basePath="${LOG_DIR}" maxDepth="1">
+                    <IfFileName glob="${HOST_IP}_dbiolog.*"/>
+                    <IfAny>
+                        <IfAccumulatedFileCount exceeds="336"/>
+                        <IfAccumulatedFileSize exceeds="1 GB"/>
+                    </IfAny>
+                </Delete>
+            </DefaultRolloverStrategy>
+        </RollingFile>
+
+        <RollingFile name="DBIO_DAO_FILE"
+                     fileName="${LOG_DIR}/${HOST_IP}_dbiolog_dao"
+                     filePattern="${LOG_DIR}/${HOST_IP}_dbiolog_dao.%d{yyyy-MM-dd-HH}"
+                     ignoreExceptions="true">
+            <PatternLayout pattern="${APP_PATTERN}" charset="UTF-8"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+            </Policies>
+            <DefaultRolloverStrategy>
+                <Delete basePath="${LOG_DIR}" maxDepth="1">
+                    <IfFileName glob="${HOST_IP}_dbiolog_dao.*"/>
+                    <IfAny>
+                        <IfAccumulatedFileCount exceeds="336"/>
+                        <IfAccumulatedFileSize exceeds="1 GB"/>
+                    </IfAny>
+                </Delete>
+            </DefaultRolloverStrategy>
+        </RollingFile>
+
+        <RollingFile name="INPUTMSG_FILE"
+                     fileName="${LOG_DIR}/${HOST_IP}_inputmsglog"
+                     filePattern="${LOG_DIR}/${HOST_IP}_inputmsglog.%d{yyyy-MM-dd-HH}"
+                     ignoreExceptions="true">
+            <PatternLayout pattern="${APP_PATTERN}" charset="UTF-8"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+            </Policies>
+            <DefaultRolloverStrategy>
+                <Delete basePath="${LOG_DIR}" maxDepth="1">
+                    <IfFileName glob="${HOST_IP}_inputmsglog.*"/>
+                    <IfAny>
+                        <IfAccumulatedFileCount exceeds="336"/>
+                        <IfAccumulatedFileSize exceeds="1 GB"/>
+                    </IfAny>
+                </Delete>
+            </DefaultRolloverStrategy>
+        </RollingFile>
+
+        <RollingFile name="OUTPUTMSG_FILE"
+                     fileName="${LOG_DIR}/${HOST_IP}_outputmsglog"
+                     filePattern="${LOG_DIR}/${HOST_IP}_outputmsglog.%d{yyyy-MM-dd-HH}"
+                     ignoreExceptions="true">
+            <PatternLayout pattern="${APP_PATTERN}" charset="UTF-8"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+            </Policies>
+            <DefaultRolloverStrategy>
+                <Delete basePath="${LOG_DIR}" maxDepth="1">
+                    <IfFileName glob="${HOST_IP}_outputmsglog.*"/>
+                    <IfAny>
+                        <IfAccumulatedFileCount exceeds="336"/>
+                        <IfAccumulatedFileSize exceeds="1 GB"/>
+                    </IfAny>
+                </Delete>
+            </DefaultRolloverStrategy>
+        </RollingFile>
+
+        <RollingFile name="ASYNCDRIVER_FILE"
+                     fileName="${LOG_DIR}/${HOST_IP}_asyncdriver.log"
+                     filePattern="${LOG_DIR}/${HOST_IP}_asyncdriver.log.%d{yyyy-MM-dd-HH}"
+                     ignoreExceptions="true">
+            <PatternLayout pattern="${APP_PATTERN}" charset="UTF-8"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+            </Policies>
+            <DefaultRolloverStrategy>
+                <Delete basePath="${LOG_DIR}" maxDepth="1">
+                    <IfFileName glob="${HOST_IP}_asyncdriver.log.*"/>
+                    <IfAny>
+                        <IfAccumulatedFileCount exceeds="336"/>
+                        <IfAccumulatedFileSize exceeds="1 GB"/>
+                    </IfAny>
+                </Delete>
+            </DefaultRolloverStrategy>
+        </RollingFile>
+
+        <RollingFile name="AUTH_FILE"
+                     fileName="${LOG_DIR}/${HOST_IP}_authlog"
+                     filePattern="${LOG_DIR}/${HOST_IP}_authlog.%d{yyyy-MM-dd-HH}"
+                     ignoreExceptions="true">
+            <PatternLayout pattern="${APP_PATTERN}" charset="UTF-8"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+            </Policies>
+            <DefaultRolloverStrategy>
+                <Delete basePath="${LOG_DIR}" maxDepth="1">
+                    <IfFileName glob="${HOST_IP}_authlog.*"/>
+                    <IfAny>
+                        <IfAccumulatedFileCount exceeds="336"/>
+                        <IfAccumulatedFileSize exceeds="1 GB"/>
+                    </IfAny>
+                </Delete>
+            </DefaultRolloverStrategy>
+        </RollingFile>
+
+        <RollingFile name="CONNECTIN_FILE"
+                     fileName="${LOG_DIR}/${HOST_IP}_connectinlog"
+                     filePattern="${LOG_DIR}/${HOST_IP}_connectinlog.%d{yyyy-MM-dd-HH}"
+                     ignoreExceptions="true">
+            <PatternLayout pattern="${APP_PATTERN}" charset="UTF-8"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+            </Policies>
+            <DefaultRolloverStrategy>
+                <Delete basePath="${LOG_DIR}" maxDepth="1">
+                    <IfFileName glob="${HOST_IP}_connectinlog.*"/>
+                    <IfAny>
+                        <IfAccumulatedFileCount exceeds="336"/>
+                        <IfAccumulatedFileSize exceeds="1 GB"/>
+                    </IfAny>
+                </Delete>
+            </DefaultRolloverStrategy>
+        </RollingFile>
+
+        <RollingFile name="CONNECTOUT_FILE"
+                     fileName="${LOG_DIR}/${HOST_IP}_connectoutlog"
+                     filePattern="${LOG_DIR}/${HOST_IP}_connectoutlog.%d{yyyy-MM-dd-HH}"
+                     ignoreExceptions="true">
+            <PatternLayout pattern="${APP_PATTERN}" charset="UTF-8"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+            </Policies>
+            <DefaultRolloverStrategy>
+                <Delete basePath="${LOG_DIR}" maxDepth="1">
+                    <IfFileName glob="${HOST_IP}_connectoutlog.*"/>
+                    <IfAny>
+                        <IfAccumulatedFileCount exceeds="336"/>
+                        <IfAccumulatedFileSize exceeds="1 GB"/>
+                    </IfAny>
+                </Delete>
+            </DefaultRolloverStrategy>
+        </RollingFile>
+
+        <RollingFile name="MRD_FILE"
+                     fileName="${LOG_DIR}/${HOST_IP}_mrdlog"
+                     filePattern="${LOG_DIR}/${HOST_IP}_mrdlog.%d{yyyy-MM-dd-HH}"
+                     ignoreExceptions="true">
+            <PatternLayout pattern="${APP_PATTERN}" charset="UTF-8"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+            </Policies>
+            <DefaultRolloverStrategy>
+                <Delete basePath="${LOG_DIR}" maxDepth="1">
+                    <IfFileName glob="${HOST_IP}_mrdlog.*"/>
+                    <IfAny>
+                        <IfAccumulatedFileCount exceeds="336"/>
+                        <IfAccumulatedFileSize exceeds="1 GB"/>
+                    </IfAny>
+                </Delete>
+            </DefaultRolloverStrategy>
+        </RollingFile>
+
+        <RollingFile name="ASYNCDRIVER_ERR_FILE"
+                     fileName="${LOG_DIR}/${HOST_IP}_asyncdriver_${ASYNCDRIVER_ERR_FILE_ID}.err"
+                     filePattern="${LOG_DIR}/${HOST_IP}_asyncdriver_${ASYNCDRIVER_ERR_FILE_ID}.err.%d{yyyy-MM-dd-HH}"
+                     ignoreExceptions="true">
+            <PatternLayout pattern="${APP_PATTERN}" charset="UTF-8"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+            </Policies>
+            <DefaultRolloverStrategy>
+                <Delete basePath="${LOG_DIR}" maxDepth="1">
+                    <IfFileName glob="${HOST_IP}_asyncdriver_${ASYNCDRIVER_ERR_FILE_ID}.err.*"/>
+                    <IfAny>
+                        <IfAccumulatedFileCount exceeds="336"/>
+                        <IfAccumulatedFileSize exceeds="1 GB"/>
+                    </IfAny>
+                </Delete>
+            </DefaultRolloverStrategy>
+        </RollingFile>
+    </Appenders>
+
+    <Loggers>
+        <!--
+            アプリのログは DEBUG まで。application.log と tracelog を含む各ファイルへ同じ内容を出す。
+            additivity=true のまま root へ伝播し、コンソールと error.log（ERROR のみ）にも載せる。
+        -->
+        <Logger name="com.example.dhapp" level="DEBUG" additivity="true">
+            <AppenderRef ref="APP_FILE"/>
+            <AppenderRef ref="KEAX_FILE"/>
+            <AppenderRef ref="KEAX0010_FILE"/>
+            <AppenderRef ref="ERR_FILE"/>
+            <AppenderRef ref="ACCESS_FILE"/>
+            <AppenderRef ref="TRACE_FILE"/>
+            <AppenderRef ref="DBIO_FILE"/>
+            <AppenderRef ref="DBIO_DAO_FILE"/>
+            <AppenderRef ref="INPUTMSG_FILE"/>
+            <AppenderRef ref="OUTPUTMSG_FILE"/>
+            <AppenderRef ref="ASYNCDRIVER_FILE"/>
+            <AppenderRef ref="AUTH_FILE"/>
+            <AppenderRef ref="CONNECTIN_FILE"/>
+            <AppenderRef ref="CONNECTOUT_FILE"/>
+            <AppenderRef ref="MRD_FILE"/>
+            <AppenderRef ref="ASYNCDRIVER_ERR_FILE"/>
+        </Logger>
+
+        <Logger name="org.springframework.transaction" level="INFO"/>
+        <Logger name="org.springframework.jdbc.core" level="INFO"/>
+
+        <Root level="INFO">
+            <AppenderRef ref="CONSOLE"/>
+            <AppenderRef ref="ERROR_FILE"/>
+        </Root>
+    </Loggers>
+</Configuration>

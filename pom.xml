@@ -23,6 +23,13 @@
         <!-- OpenJDK 21 -->
         <java.version>21</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!--
+            Log4j 2 を 2.25.3 に固定する。Spring Boot 3.3.5 の親 POM は 2.23.1 を管理するが、
+            調査対象の実装（log4j-api / log4j-core / log4j-slf4j2-impl）は 2.25.3。
+            JBoss EAP 8.1 が同梱する log4j-api は 2.23.1 で、war 側と混ぜると LinkageError になる。
+            サーバ側 API は jboss-deployment-structure.xml で除外する。
+        -->
+        <log4j2.version>2.25.3</log4j2.version>
         <!-- AWS SDK for Java v2（SQS 送信 API で使用） -->
         <aws-sdk.version>2.54.18</aws-sdk.version>
     </properties>
@@ -40,10 +47,37 @@
     </dependencyManagement>
 
     <dependencies>
-        <!-- Spring MVC (REST) -->
+        <!-- Spring MVC (REST)。ログ実装は Logback ではなく Log4j 2。 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-logging</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <!--
+            SLF4J 2 API の実体。アプリケーションコードは LoggerFactory のまま。
+            この 3 つの jar（2.25.3）だけを war に入れ、Logback と log4j-to-slf4j は入れない。
+            log4j-to-slf4j が残ると log4j-slf4j2-impl と循環する。
+        -->
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-api</artifactId>
+            <version>${log4j2.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-core</artifactId>
+            <version>${log4j2.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-slf4j2-impl</artifactId>
+            <version>${log4j2.version}</version>
         </dependency>
 
         <!--
@@ -54,24 +88,48 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-tomcat</artifactId>
             <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-logging</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <!-- JdbcTemplate（DataSource は WildFly の JNDI から取得） -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-jdbc</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-logging</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <!-- ElastiCache for Valkey (Redis 互換) 用 Spring Data Redis + Lettuce -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-redis</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-logging</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <!-- Bean Validation (jakarta.validation) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-logging</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <!--
@@ -127,6 +185,12 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-logging</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
     </dependencies>
 
@@ -137,6 +201,16 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <!-- テストが /mnt/logs を作らないようにする。log4j2 は sys → env の順で読む。 -->
+                    <systemPropertyVariables>
+                        <EFS_LOGS_PATH>${project.build.directory}/test-logs</EFS_LOGS_PATH>
+                    </systemPropertyVariables>
+                </configuration>
             </plugin>
         </plugins>
     </build>

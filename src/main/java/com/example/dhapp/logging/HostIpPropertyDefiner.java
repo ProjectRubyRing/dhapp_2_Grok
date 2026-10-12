@@ -5,12 +5,12 @@ import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.util.Collections;
 
-import ch.qos.logback.core.PropertyDefinerBase;
+import org.apache.logging.log4j.status.StatusLogger;
 
 /**
- * ログファイル名のプレフィックスに使う、このホストの IPv4 アドレスを返す Logback の PropertyDefiner。
+ * ログファイル名のプレフィックスに使う、このホストの IPv4 アドレス。
  *
- * <p>logback-spring.xml の {@code <define>} から呼ばれ、区切り文字をハイフンに置き換えた形
+ * <p>log4j2-spring.xml の {@code ${dhlog:hostip}} から呼ばれ、区切り文字をハイフンに置き換えた形
  * （例: {@code 10.0.1.23} → {@code 10-0-1-23}）で返す。</p>
  *
  * <p>アドレスは次の順で決める。
@@ -19,14 +19,14 @@ import ch.qos.logback.core.PropertyDefinerBase;
  *   <li>稼働中・非ループバック・非仮想の NIC に付いた IPv4（サイトローカルを優先）</li>
  *   <li>どれも取れなければ {@code 127.0.0.1}</li>
  * </ol>
- * Logback の初期化中に呼ばれるため、例外は外へ投げずフォールバックする
- * （投げるとプロパティが未定義になり、ファイル名が {@code HOST_IP_IS_UNDEFINED} になる）。</p>
+ * Log4j2 の設定読み込み中に呼ばれるため、例外は外へ投げずフォールバックする。</p>
  */
-public class HostIpPropertyDefiner extends PropertyDefinerBase {
+public class HostIpPropertyDefiner {
 
     static final String FALLBACK_ADDRESS = "127.0.0.1";
 
-    @Override
+    private static final StatusLogger STATUS = StatusLogger.getLogger();
+
     public String getPropertyValue() {
         return toFileNameToken(resolveAddress());
     }
@@ -43,7 +43,7 @@ public class HostIpPropertyDefiner extends PropertyDefinerBase {
                 return local.getHostAddress();
             }
         } catch (Exception e) {
-            addWarn("InetAddress.getLocalHost() failed; falling back to network interfaces", e);
+            STATUS.warn("InetAddress.getLocalHost() failed; falling back to network interfaces", e);
         }
 
         try {
@@ -73,10 +73,10 @@ public class HostIpPropertyDefiner extends PropertyDefinerBase {
                 return other;
             }
         } catch (Exception e) {
-            addWarn("Failed to enumerate network interfaces", e);
+            STATUS.warn("Failed to enumerate network interfaces", e);
         }
 
-        addWarn("No non-loopback IPv4 address found; using " + FALLBACK_ADDRESS);
+        STATUS.warn("No non-loopback IPv4 address found; using {}", FALLBACK_ADDRESS);
         return FALLBACK_ADDRESS;
     }
 }

@@ -478,15 +478,16 @@ aws sqs receive-message --queue-url "$SQS_QUEUE_URL" --query 'Messages[].Body'
 各機能（demo / db / cache / external / external-get / sqs / file / tls / config / secure-api）は、REST API で処理した内容
 （リクエスト内容・処理ステップ・レスポンス・処理時間）を詳細にログへ出力する。ファイルアップロード
 API では**保存先の絶対パスと保存したファイルのサイズ**が INFO で出力される。出力先・フォーマットは
-`src/main/resources/logback-spring.xml` で構成し、出力ルートは **環境変数 `EFS_LOGS_PATH`** で指定する。
+`src/main/resources/log4j2-spring.xml`（Log4j 2.25.3。`log4j-api` / `log4j-core` / `log4j-slf4j2-impl`）で構成し、出力ルートは **環境変数 `EFS_LOGS_PATH`** で指定する。
 
 `GET /api/config/date-config` と `GET /api/secure-api/call` は、結果のテキストレポートを
 **ログと同時にコンソール（標準出力）へも直接出力する**。コンソールへの出力は UTF-8 固定で書くため、
 コンテナのロケールが `POSIX` / `C`（`stdout.encoding` が ASCII）でも日本語が化けない。
 同じレポートはレスポンスの `report` フィールドと `?format=text` からも取得できる。
 
-> WildFly(JBoss EAP) デプロイ時は `jboss-deployment-structure.xml` で logging サブシステムを除外して
-> いるため、ログ出力は war 内の Logback（Spring Boot 標準）が担う。
+> WildFly(JBoss EAP 8.1) デプロイ時は `jboss-deployment-structure.xml` で logging サブシステムと
+> `org.apache.logging.log4j.api` / `org.jboss.logmanager.log4j2` / `org.slf4j` を除外する。
+> 除外しないとサーバ同梱の log4j-api が log4j2-jboss-logmanager に束縛され、war 内の Log4j 2.25.3 は使われない。
 
 `${EFS_LOGS_PATH}` に出力するログファイルは、ファイル名の先頭に **ホストの IPv4 アドレス（区切り文字は
 ハイフン）と `_`** がプレフィックスとして付く（以下の表では `<IP>` と表記）。例えば IP アドレスが
@@ -521,7 +522,7 @@ API では**保存先の絶対パスと保存したファイルのサイズ**が
 
 `<ランダム>.err` の `<ランダム>` 部分は英大文字・英小文字・数字（`[a-zA-Z0-9]`）20 文字のランダム文字列、
 `asyncdriver_<ランダム数字>.err` の `<ランダム数字>` 部分は数字（`[0-9]`）17 桁のランダム文字列で、
-どちらも起動時（Logback の設定読み込み時）に 1 回だけ生成される
+どちらも起動時（Log4j 2 の設定読み込み時）に 1 回だけ生成される
 （例: `10-0-1-23_aZ3kP9qL0xT7mB2nR5wY.err`、`10-0-1-23_asyncdriver_48213907561234098.err`）。
 同じ起動中は同じファイルに出力し、再起動ごとに別名のファイルになる。前回起動時のファイルはローテーション
 （`maxHistory`）による自動削除の対象外になるため、不要になったものは運用側で削除する。

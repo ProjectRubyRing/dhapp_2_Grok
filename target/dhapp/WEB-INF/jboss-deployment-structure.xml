@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Spring Boot(Spring MVC) を WildFly / JBoss EAP 8.1 に WAR デプロイする際の調整。
+
+    - jaxrs (RESTEasy) サブシステムを除外:
+        Spring MVC と RESTEasy がリクエストマッピングで競合するのを防ぐ。
+    - weld (CDI) サブシステムを除外:
+        Spring の DI を使うため CDI スキャンは不要。
+    - jpa サブシステムを除外:
+        本アプリは JPA を使わず JdbcTemplate のみ。
+    - logging サブシステムを除外:
+        除外しないと LoggingDependencyDeploymentProcessor が
+        org.apache.logging.log4j.api を importServices=true でデプロイに足す
+        （WildFly Core 27 / EAP 8.1 の LoggingModuleDependency.LOG4J2）。
+
+    EAP 8.1 相当（WildFly 35、WildFly Core 27）のモジュール org.apache.logging.log4j.api は
+    サーバ同梱の log4j-api（EAP 8.1 では 2.23.1）であり、module.xml で
+    org.jboss.logmanager.log4j2 を services="import" している。
+    この API が見えると LogManager の static が log4j2-jboss-logmanager に束縛され、
+    war 内の log4j-core-2.25.3 と log4j2-spring.xml（tracelog の RollingFile）は使われない。
+    モジュールコメントにも "Users wanting to not use this implementation need to also not use this API."
+    とある。war の log4j-api-2.25.3 + log4j-core-2.25.3 + log4j-slf4j2-impl-2.25.3 だけを
+    使うため、ログ系モジュールをデプロイのクラスローダから除外する。
+
+    logging サブシステムを除外しても、EAP の版によっては暗黙のモジュール依存が残る。
+    そのためサブシステム除外に加えて <exclusions> でモジュール名を明示する。
+
+    XA データソース／JTA は datasources / transactions サブシステムが提供するので除外しない。
+-->
+<jboss-deployment-structure xmlns="urn:jboss:deployment-structure:1.3">
+    <deployment>
+        <exclude-subsystems>
+            <subsystem name="jaxrs"/>
+            <subsystem name="weld"/>
+            <subsystem name="jpa"/>
+            <subsystem name="logging"/>
+            <!--
+                weld を外すと Mojarra の ConfigureListener が
+                "CDI is not available" でデプロイを落とす。このアプリは JSF を使わない。
+                batch も BeanManager を要求するため、同じく外す。
+            -->
+            <subsystem name="jsf"/>
+            <subsystem name="batch"/>
+        </exclude-subsystems>
+
+        <exclusions>
+            <!-- サーバの log4j-api（jboss-logmanager 橋）。war の 2.25.3 を使う。 -->
+            <module name="org.apache.logging.log4j.api"/>
+            <module name="org.jboss.logmanager.log4j2"/>
+
+            <!-- SLF4J は war の slf4j-api 2.x + log4j-slf4j2-impl だけにする。 -->
+            <module name="org.slf4j"/>
+            <module name="org.slf4j.impl"/>
+            <module name="org.slf4j.ext"/>
+            <module name="org.jboss.logging"/>
+            <module name="org.jboss.logmanager"/>
+            <module name="org.jboss.logging.jul-to-slf4j-stub"/>
+            <module name="org.jboss.logmanager.log4j"/>
+            <module name="org.apache.commons.logging"/>
+            <module name="org.apache.log4j"/>
+        </exclusions>
+    </deployment>
+</jboss-deployment-structure>

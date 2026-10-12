@@ -151,12 +151,14 @@ app:
       truststore-file-name: ${JBOSS_TRUSTSTORE_FILE_NAME:jboss-truststore.p12}
 
 # ===== ログ出力 =====
-# ファイル出力先・フォーマットは src/main/resources/logback-spring.xml で構成する。
+# ファイル出力先・フォーマットは src/main/resources/log4j2-spring.xml（Log4j 2.25.3）で構成する。
 # 出力ルートは環境変数 EFS_LOGS_PATH で指定する（未設定時は /mnt/logs/front/logs/inter-api）。
+# システムプロパティ EFS_LOGS_PATH があればそれが先。
 # ファイル名の先頭にはホストの IPv4 アドレス（区切りはハイフン）が付く（例: 10-0-1-23_application.log）。
 #   ${EFS_LOGS_PATH}/<IP>_application.log … 各 REST API 機能の処理内容を詳細に記録
+#   ${EFS_LOGS_PATH}/<IP>_tracelog        … 同じ内容。時間単位でローテーション（stale file handle 調査対象）
 #   ${EFS_LOGS_PATH}/<IP>_error.log       … ERROR のみ。Java 例外スタックトレース形式（CloudWatch マルチライン検証用）
-# ここでのレベル設定は logback-spring.xml のロガー設定と併せて有効になる。
+# ここでのレベル設定は log4j2-spring.xml のロガー設定と併せて有効になる。
 logging:
   level:
     root: INFO

@@ -6,19 +6,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
-import ch.qos.logback.classic.LoggerContext;
-
 /**
- * logback-spring.xml のログファイル名に使う PropertyDefiner（IP プレフィックス・ランダム文字列）の確認。
+ * log4j2-spring.xml のログファイル名に使うホスト IP とランダム文字列の確認。
  */
 class LogFileNamePropertyDefinerTest {
 
     @Test
     void hostIpIsIpv4WithHyphenSeparators() {
-        HostIpPropertyDefiner definer = new HostIpPropertyDefiner();
-        definer.setContext(new LoggerContext());
-
-        String value = definer.getPropertyValue();
+        String value = new HostIpPropertyDefiner().getPropertyValue();
 
         assertTrue(value.matches("\\d{1,3}-\\d{1,3}-\\d{1,3}-\\d{1,3}"), value);
         assertEquals("10-0-1-23", HostIpPropertyDefiner.toFileNameToken("10.0.1.23"));
@@ -46,5 +41,22 @@ class LogFileNamePropertyDefinerTest {
         String value = definer.getPropertyValue();
         assertTrue(value.matches("[0-9]{17}"), value);
         assertNotEquals(value, definer.getPropertyValue());
+    }
+
+    @Test
+    void dhLogLookupCachesHostIpAndRandomToken() {
+        DhLogLookup lookup = new DhLogLookup();
+
+        String host = lookup.lookup(null, "hostip");
+        assertTrue(host.matches("\\d{1,3}-\\d{1,3}-\\d{1,3}-\\d{1,3}"), host);
+        assertEquals(host, lookup.lookup(null, "hostip"));
+
+        String token = lookup.lookup(null, "rand:20:alnum");
+        assertTrue(token.matches("[a-zA-Z0-9]{20}"), token);
+        assertEquals(token, lookup.lookup(null, "rand:20:alnum"));
+
+        String digits = lookup.lookup(null, "rand:17:digits");
+        assertTrue(digits.matches("[0-9]{17}"), digits);
+        assertEquals(digits, lookup.lookup(null, "rand:17:digits"));
     }
 }
